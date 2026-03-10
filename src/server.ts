@@ -9,6 +9,7 @@ import {
   initializeWhatsAppSocket,
 } from './app/modules/whatsapp/whatsapp.socket';
 import envVariables from './config/env';
+import { closeQueue } from './config/messageQueue';
 
 // import { prisma } from './config/prisma';
 import {
@@ -69,6 +70,9 @@ async function gracefulShutdown(signal: string) {
 
   // Destroy WhatsApp client
   await destroyWhatsAppClient();
+
+  // Close BullMQ queue and worker
+  await closeQueue();
 
   if (server) {
     server.close(() => {
