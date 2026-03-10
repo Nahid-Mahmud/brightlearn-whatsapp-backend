@@ -13,3 +13,8 @@ build
 /src/generated/prisma
 prisma/migrations
 .vercel
+
+
+# WhatsApp Web session data
+.wwebjs_auth
+.wwebjs_cache
