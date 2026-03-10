@@ -72,8 +72,8 @@ REDIS_PASSWORD=your_redis_password
 REDIS_HOST=localhost
 REDIS_PORT=6379
 
-# Test Phone Numbers (Required for tests)
-TEST_PHONE_NUMBERS=+1234567890,+0987654321
+# Test Phone Numbers (Required for tests, No + sign)
+TEST_PHONE_NUMBERS=1234567890,0987654321
 ```
 
 ### Environment Variables Description
