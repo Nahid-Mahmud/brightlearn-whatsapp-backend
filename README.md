@@ -158,8 +158,75 @@ The API runs on `http://localhost:PORT` where PORT is defined in your `.env` fil
 
 ### WhatsApp Routes
 
-- All WhatsApp-related routes are available under `/api/whatsapp`
-- Refer to [TESTING_GUIDE.md](TESTING_GUIDE.md) for detailed API documentation
+All WhatsApp-related routes are available under `/api/v1/whatsapp`. Below are curl examples for each endpoint:
+
+#### 1. Get WhatsApp Status
+
+Check the status of the WhatsApp client and message queue.
+
+```bash
+curl -X GET http://localhost:5000/api/v1/whatsapp/status
+```
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "message": "Status retrieved successfully",
+  "data": {
+    "clientStatus": "ready",
+    "queueStatus": {
+      "waiting": 0,
+      "active": 0,
+      "completed": 5,
+      "failed": 0
+    }
+  }
+}
+```
+
+#### 2. Send Message to Single Number
+
+Send a WhatsApp message to a single phone number.
+
+```bash
+curl -X POST http://localhost:5000/api/v1/whatsapp/send-message \
+  -H "Content-Type: application/json" \
+  -d '{
+    "phoneNumber": "8801234567890",
+    "message": "Hello from WhatsApp API!"
+  }'
+```
+
+**Note:** Phone number format should be: `{country_code}{number}` (no + sign, no spaces). Example: `8801234567890` for Bangladesh, `919876543210` for India.
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "message": "Message sent successfully",
+  "data": {
+    "messageId": "msg_123456789"
+  }
+}
+```
+
+#### 3. Send Bulk Messages
+
+Send messages to multiple phone numbers (comma separated).
+
+```bash
+curl -X POST http://localhost:5000/api/v1/whatsapp/send-bulk-message \
+  -H "Content-Type: application/json" \
+  -d '{
+    "phoneNumbers": ["8801234567890", "919876543210", "14155552671"],
+    "message": "Bulk message from WhatsApp API!"
+  }'
+```
+
+For more detailed API documentation and testing examples, refer to [TESTING_GUIDE.md](TESTING_GUIDE.md).
 
 ## Troubleshooting
 
