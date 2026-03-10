@@ -27,6 +27,13 @@ router.post(
   whatsappController.sendMessage
 );
 
+router.post(
+  '/send-bulk-message',
+  whatsappSendRateLimiter,
+  validateRequest(whatsappValidation.sendBulkMessageValidationSchema),
+  whatsappController.sendBulkMessage
+);
+
 router.get('/status', whatsappController.getStatus);
 
 export const whatsappRoutes = router;

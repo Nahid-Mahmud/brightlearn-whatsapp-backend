@@ -18,7 +18,7 @@ const sendMessage = async (phoneNumber: string, message: string) => {
 
     return {
       phoneNumber,
-      status: 'sent',
+      status: 'queued',
       message,
       ...result,
     };
@@ -36,6 +36,37 @@ const sendMessage = async (phoneNumber: string, message: string) => {
   }
 };
 
+const bulkSendMessages = async (
+  messages: { phoneNumber: string; message: string }[]
+) => {
+  const status = getClientStatus();
+
+  if (status !== 'ready') {
+    throw new AppError(
+      StatusCodes.SERVICE_UNAVAILABLE,
+      `WhatsApp client is not ready. Current status: ${status}. Please scan the QR code first.`
+    );
+  }
+
+  messages.forEach(({ phoneNumber, message }) => {
+    void enqueueMessage(phoneNumber, message).catch((error) => {
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error occurred';
+
+      // eslint-disable-next-line no-console
+      console.error(
+        `[WhatsApp Service] Failed to enqueue bulk message for ${phoneNumber}:`,
+        errorMessage
+      );
+    });
+  });
+
+  return {
+    total: messages.length,
+    message: 'Bulk message queueing initiated.',
+  };
+};
+
 const getStatus = async () => {
   const clientStatus = getClientStatus();
   const queueStats = await getQueueStats();
@@ -51,5 +82,6 @@ const getStatus = async () => {
 
 export const whatsappService = {
   sendMessage,
+  bulkSendMessages,
   getStatus,
 };

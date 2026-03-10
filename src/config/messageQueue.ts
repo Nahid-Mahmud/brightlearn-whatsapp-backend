@@ -12,6 +12,11 @@ interface MessageJobResult {
   timestamp: string;
 }
 
+interface EnqueueMessageResult {
+  jobId: string;
+  queuedAt: string;
+}
+
 const QUEUE_NAME = 'whatsapp-messages';
 
 const redisConnection = {
@@ -86,7 +91,6 @@ const messageWorker = new Worker<MessageJobData, MessageJobResult>(
   }
 );
 
-
 messageWorker.on('completed', (job) => {
   // eslint-disable-next-line no-console
   console.log(`[MessageQueue] Job ${job.id} completed successfully`);
@@ -102,11 +106,10 @@ messageWorker.on('error', (err) => {
   console.error('[MessageQueue] Worker error:', err.message);
 });
 
-
 export async function enqueueMessage(
   phoneNumber: string,
   message: string
-): Promise<MessageJobResult> {
+): Promise<EnqueueMessageResult> {
   const job = await messageQueue.add('send-message', {
     phoneNumber,
     message,
@@ -115,13 +118,10 @@ export async function enqueueMessage(
   // eslint-disable-next-line no-console
   console.log(`[MessageQueue] Enqueued job ${job.id} for ${phoneNumber}`);
 
-  // Wait for the job to complete and return the result
-  const result = await job.waitUntilFinished(
-    queueEvents,
-    30_000 // 30s timeout
-  );
-
-  return result;
+  return {
+    jobId: String(job.id),
+    queuedAt: new Date().toISOString(),
+  };
 }
 
 export async function getQueueStats() {
