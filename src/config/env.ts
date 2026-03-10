@@ -9,6 +9,7 @@ interface EnvVariables {
   REDIS_PASSWORD: string;
   REDIS_HOST: string;
   REDIS_PORT: string;
+  TEST_PHONE_NUMBERS?: string;
 }
 
 const loadEnvVariable = (): EnvVariables => {
@@ -34,8 +35,20 @@ const loadEnvVariable = (): EnvVariables => {
     REDIS_PASSWORD: process.env.REDIS_PASSWORD as string,
     REDIS_HOST: process.env.REDIS_HOST as string,
     REDIS_PORT: process.env.REDIS_PORT as string,
+    TEST_PHONE_NUMBERS: process.env.TEST_PHONE_NUMBERS,
   };
 };
 
 const envVariables = loadEnvVariable();
+
+// Helper function to get test phone numbers as array
+export const getTestPhoneNumbers = (): string[] => {
+  if (!envVariables.TEST_PHONE_NUMBERS) {
+    throw new Error(
+      'Missing required environment variable: TEST_PHONE_NUMBERS'
+    );
+  }
+  return envVariables.TEST_PHONE_NUMBERS.split(',').map((num) => num.trim());
+};
+
 export default envVariables;

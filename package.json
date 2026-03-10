@@ -4,7 +4,7 @@
   "description": "A backend project using Prisma ORM with Jest testing framework",
   "main": "index.js",
   "scripts": {
-    "test": "NODE_ENV=test jest --runInBand",
+    "test": "NODE_ENV=test jest --detectOpenHandles --forceExit",
     "dev": "tsx watch src/server.ts",
     "build": "npx eslint ./src && tsc",
     "start": "node ./dist/server.js",
