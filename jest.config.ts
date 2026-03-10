@@ -21,6 +21,7 @@ const config: Config = {
   ],
   coverageDirectory: 'coverage',
   verbose: true,
+  testTimeout: 30000, // 30 seconds timeout for tests
   transform: {
     '^.+\\.ts$': 'ts-jest',
   },

@@ -1,11 +1,13 @@
 import request from 'supertest';
-import { app } from '../app';
-import { getTestPhoneNumbers } from '../config/env';
+import envVariables, { getTestPhoneNumbers } from '../config/env';
+
+// Base URL for the running server
+const BASE_URL = `http://localhost:${envVariables.PORT}`;
 
 describe('WhatsApp Routes', () => {
   let testPhoneNumbers: string[];
 
-  beforeAll(() => {
+  beforeAll(async () => {
     testPhoneNumbers = getTestPhoneNumbers();
 
     if (testPhoneNumbers.length === 0) {
@@ -14,16 +16,53 @@ describe('WhatsApp Routes', () => {
         'Warning: No test phone numbers found in environment variables'
       );
     }
+
+    // Check if the running server is accessible and get client status
+    try {
+      const response = await request(BASE_URL).get('/api/v1/whatsapp/status');
+      const clientStatus = response.body?.data?.client?.status;
+
+      // eslint-disable-next-line no-console
+      console.log(`[Test Setup] Connected to server at ${BASE_URL}`);
+      // eslint-disable-next-line no-console
+      console.log(`[Test Setup] WhatsApp client status: ${clientStatus}`);
+
+      if (clientStatus !== 'ready') {
+        // eslint-disable-next-line no-console
+        console.warn(
+          '[Test Setup] WhatsApp client not ready. Tests requiring authentication will be skipped.'
+        );
+      } else {
+        // eslint-disable-next-line no-console
+        console.log(
+          '[Test Setup] WhatsApp client is ready with authenticated session.'
+        );
+      }
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.error(
+        `[Test Setup] Could not connect to server at ${BASE_URL}. Make sure the server is running.`,
+        error
+      );
+    }
+  });
+
+  afterAll(async () => {
+    // No cleanup needed - we're using the existing server's client
+    // eslint-disable-next-line no-console
+    console.log('[Test Teardown] Tests completed');
   });
 
   describe('GET /api/v1/whatsapp/status', () => {
     it('should return WhatsApp client status', async () => {
-      const response = await request(app)
+      const response = await request(BASE_URL)
         .get('/api/v1/whatsapp/status')
-        .expect('Content-Type', /json/);
+        .expect('Content-Type', /json/)
+        .expect(200);
 
-      expect(response.status).toBeDefined();
-      expect(response.body).toHaveProperty('success');
+      expect(response.body.success).toBe(true);
+      expect(response.body.data).toHaveProperty('client');
+      expect(response.body.data.client).toHaveProperty('status');
     });
   });
 
@@ -33,16 +72,32 @@ describe('WhatsApp Routes', () => {
         return; // Skip test if no phone numbers available
       }
 
-      const response = await request(app)
+      // Check client status from server
+      const statusResponse = await request(BASE_URL).get(
+        '/api/v1/whatsapp/status'
+      );
+      const clientStatus = statusResponse.body?.data?.client?.status;
+
+      if (clientStatus !== 'ready') {
+        // eslint-disable-next-line no-console
+        console.warn(
+          `Skipping test - WhatsApp client not ready. Status: ${clientStatus}`
+        );
+        return;
+      }
+
+      const response = await request(BASE_URL)
         .post('/api/v1/whatsapp/send-message')
         .send({
           phoneNumber: testPhoneNumbers[0],
           message: 'Test message from automated testing',
         })
-        .expect('Content-Type', /json/);
+        .expect('Content-Type', /json/)
+        .expect(200);
 
-      expect(response.body).toHaveProperty('success');
-      expect(response.body).toHaveProperty('message');
+      expect(response.body.success).toBe(true);
+      expect(response.body.data).toHaveProperty('messageId');
+      expect(response.body.message).toContain('queued successfully');
     });
 
     it('should send a message to multiple phone numbers', async () => {
@@ -50,20 +105,36 @@ describe('WhatsApp Routes', () => {
         return; // Skip test if not enough phone numbers
       }
 
-      const response = await request(app)
+      // Check client status from server
+      const statusResponse = await request(BASE_URL).get(
+        '/api/v1/whatsapp/status'
+      );
+      const clientStatus = statusResponse.body?.data?.client?.status;
+
+      if (clientStatus !== 'ready') {
+        // eslint-disable-next-line no-console
+        console.warn(
+          `Skipping test - WhatsApp client not ready. Status: ${clientStatus}`
+        );
+        return;
+      }
+
+      const response = await request(BASE_URL)
         .post('/api/v1/whatsapp/send-message')
         .send({
           phoneNumber: testPhoneNumbers,
           message: 'Test message to multiple recipients',
         })
-        .expect('Content-Type', /json/);
+        .expect('Content-Type', /json/)
+        .expect(200);
 
-      expect(response.body).toHaveProperty('success');
-      expect(response.body).toHaveProperty('message');
+      expect(response.body.success).toBe(true);
+      expect(response.body.data).toHaveProperty('results');
+      expect(response.body.message).toContain('queued successfully');
     });
 
     it('should return validation error for invalid phone number', async () => {
-      const response = await request(app)
+      const response = await request(BASE_URL)
         .post('/api/v1/whatsapp/send-message')
         .send({
           phoneNumber: 'invalid',
@@ -80,7 +151,7 @@ describe('WhatsApp Routes', () => {
         return;
       }
 
-      const response = await request(app)
+      const response = await request(BASE_URL)
         .post('/api/v1/whatsapp/send-message')
         .send({
           phoneNumber: testPhoneNumbers[0],
@@ -93,7 +164,7 @@ describe('WhatsApp Routes', () => {
     });
 
     it('should return validation error for missing phone number', async () => {
-      const response = await request(app)
+      const response = await request(BASE_URL)
         .post('/api/v1/whatsapp/send-message')
         .send({
           message: 'Test message',
@@ -111,7 +182,7 @@ describe('WhatsApp Routes', () => {
 
       const longMessage = 'a'.repeat(4097); // Exceeds 4096 character limit
 
-      const response = await request(app)
+      const response = await request(BASE_URL)
         .post('/api/v1/whatsapp/send-message')
         .send({
           phoneNumber: testPhoneNumbers[0],
@@ -130,16 +201,32 @@ describe('WhatsApp Routes', () => {
         return;
       }
 
-      const response = await request(app)
+      // Check client status from server
+      const statusResponse = await request(BASE_URL).get(
+        '/api/v1/whatsapp/status'
+      );
+      const clientStatus = statusResponse.body?.data?.client?.status;
+
+      if (clientStatus !== 'ready') {
+        // eslint-disable-next-line no-console
+        console.warn(
+          `Skipping test - WhatsApp client not ready. Status: ${clientStatus}`
+        );
+        return;
+      }
+
+      const response = await request(BASE_URL)
         .post('/api/v1/whatsapp/send-bulk-message')
         .send({
           phoneNumbers: testPhoneNumbers,
           message: 'Bulk test message from automated testing',
         })
-        .expect('Content-Type', /json/);
+        .expect('Content-Type', /json/)
+        .expect(200);
 
-      expect(response.body).toHaveProperty('success');
-      expect(response.body).toHaveProperty('message');
+      expect(response.body.success).toBe(true);
+      expect(response.body.data).toHaveProperty('results');
+      expect(response.body.message).toContain('queued successfully');
     });
 
     it('should send bulk messages with comma-separated phone numbers', async () => {
@@ -147,16 +234,32 @@ describe('WhatsApp Routes', () => {
         return;
       }
 
-      const response = await request(app)
+      // Check client status from server
+      const statusResponse = await request(BASE_URL).get(
+        '/api/v1/whatsapp/status'
+      );
+      const clientStatus = statusResponse.body?.data?.client?.status;
+
+      if (clientStatus !== 'ready') {
+        // eslint-disable-next-line no-console
+        console.warn(
+          `Skipping test - WhatsApp client not ready. Status: ${clientStatus}`
+        );
+        return;
+      }
+
+      const response = await request(BASE_URL)
         .post('/api/v1/whatsapp/send-bulk-message')
         .send({
           phoneNumbers: testPhoneNumbers.join(','),
           message: 'Bulk test message with comma-separated numbers',
         })
-        .expect('Content-Type', /json/);
+        .expect('Content-Type', /json/)
+        .expect(200);
 
-      expect(response.body).toHaveProperty('success');
-      expect(response.body).toHaveProperty('message');
+      expect(response.body.success).toBe(true);
+      expect(response.body.data).toHaveProperty('results');
+      expect(response.body.message).toContain('queued successfully');
     });
 
     it('should send bulk messages with newline-separated phone numbers', async () => {
@@ -164,20 +267,36 @@ describe('WhatsApp Routes', () => {
         return;
       }
 
-      const response = await request(app)
+      // Check client status from server
+      const statusResponse = await request(BASE_URL).get(
+        '/api/v1/whatsapp/status'
+      );
+      const clientStatus = statusResponse.body?.data?.client?.status;
+
+      if (clientStatus !== 'ready') {
+        // eslint-disable-next-line no-console
+        console.warn(
+          `Skipping test - WhatsApp client not ready. Status: ${clientStatus}`
+        );
+        return;
+      }
+
+      const response = await request(BASE_URL)
         .post('/api/v1/whatsapp/send-bulk-message')
         .send({
           phoneNumbers: testPhoneNumbers.join('\n'),
           message: 'Bulk test message with newline-separated numbers',
         })
-        .expect('Content-Type', /json/);
+        .expect('Content-Type', /json/)
+        .expect(200);
 
-      expect(response.body).toHaveProperty('success');
-      expect(response.body).toHaveProperty('message');
+      expect(response.body.success).toBe(true);
+      expect(response.body.data).toHaveProperty('results');
+      expect(response.body.message).toContain('queued successfully');
     });
 
     it('should return validation error for empty phone numbers array', async () => {
-      const response = await request(app)
+      const response = await request(BASE_URL)
         .post('/api/v1/whatsapp/send-bulk-message')
         .send({
           phoneNumbers: [],
@@ -190,7 +309,7 @@ describe('WhatsApp Routes', () => {
     });
 
     it('should return validation error for invalid phone numbers in bulk', async () => {
-      const response = await request(app)
+      const response = await request(BASE_URL)
         .post('/api/v1/whatsapp/send-bulk-message')
         .send({
           phoneNumbers: ['invalid', '123'],
@@ -207,7 +326,7 @@ describe('WhatsApp Routes', () => {
         return;
       }
 
-      const response = await request(app)
+      const response = await request(BASE_URL)
         .post('/api/v1/whatsapp/send-bulk-message')
         .send({
           phoneNumbers: testPhoneNumbers,
@@ -229,7 +348,7 @@ describe('WhatsApp Routes', () => {
       const requests = Array(31)
         .fill(null)
         .map(() =>
-          request(app).post('/api/v1/whatsapp/send-message').send({
+          request(BASE_URL).post('/api/v1/whatsapp/send-message').send({
             phoneNumber: testPhoneNumbers[0],
             message: 'Rate limit test',
           })

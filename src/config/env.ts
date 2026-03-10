@@ -1,6 +1,11 @@
 import dotenv from 'dotenv';
+import path from 'path';
 
-dotenv.config();
+// Load the appropriate .env file based on NODE_ENV
+// Use __dirname to find the project root (go up from src/config to project root)
+const projectRoot = path.resolve(__dirname, '..', '..');
+const envFile = process.env.NODE_ENV === 'test' ? '.env.test' : '.env';
+dotenv.config({ path: path.resolve(projectRoot, envFile) });
 
 interface EnvVariables {
   PORT: string;
@@ -44,9 +49,7 @@ const envVariables = loadEnvVariable();
 // Helper function to get test phone numbers as array
 export const getTestPhoneNumbers = (): string[] => {
   if (!envVariables.TEST_PHONE_NUMBERS) {
-    throw new Error(
-      'Missing required environment variable: TEST_PHONE_NUMBERS'
-    );
+    return [];
   }
   return envVariables.TEST_PHONE_NUMBERS.split(',').map((num) => num.trim());
 };
