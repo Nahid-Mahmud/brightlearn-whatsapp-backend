@@ -1,136 +1,54 @@
-# WhatsApp Testing & Troubleshooting Guide
+# Testing Guide
 
-## Problem Summary
+This guide covers how to set up and run tests for the WhatsApp Backend API.
 
-Your tests were **passing incorrectly** while actual WhatsApp messages were **not being sent**. Here's what was wrong:
+## Prerequisites
 
-### Root Causes
+Before running tests, ensure you have:
 
-1. **Weak Test Assertions** ❌
-   - Tests only checked if `success` and `message` properties existed
-   - Did NOT check if `success === true` or if status code was 200
-   - **Result**: Tests passed even when getting 503 errors
+- Node.js (v18 or higher) installed
+- pnpm installed
+- Redis server running
+- All dependencies installed (`pnpm install`)
 
-2. **WhatsApp Client Not Initialized in Tests** ❌
-   - Tests imported `app` from `app.ts`
-   - WhatsApp client is initialized in `server.ts`, not in `app.ts`
-   - **Result**: Client status was "disconnected" during tests
+## Test Environment Setup
 
-## What Was Fixed
+### 1. Create `.env.test` File
 
-### ✅ Test Assertions Fixed
+Create a `.env.test` file in the root directory of the project:
 
-- Now properly check `response.body.success === true`
-- Now verify status code is 200 with `.expect(200)`
-- Now verify response data structure (messageId, results, etc.)
+```env
+# Server Configuration
+PORT=5001
+NODE_ENV=test
 
-### ✅ WhatsApp Client Initialization Added
+# Redis Configuration
+REDIS_USER_NAME=default
+REDIS_PASSWORD=your_redis_password
+REDIS_HOST=localhost
+REDIS_PORT=6379
 
-- `beforeAll()` now initializes WhatsApp client before tests run
-- Tests wait up to 60 seconds for client to be ready
-- Tests skip if client is not ready (with warning)
-
-### ✅ Proper Cleanup Added
-
-- `afterAll()` destroys WhatsApp client after tests complete
-
-## How to Run Tests Properly
-
-### Option 1: Run with QR Code Scanning (Full Integration Test)
-
-```bash
-# Run tests - you'll need to scan QR code when prompted
-npm test
-# or
-pnpm test
+# Test Phone Numbers (comma-separated, with country code, no + sign)
+TEST_PHONE_NUMBERS=919876543210,919876543211
 ```
 
-When the test starts:
+### 2. Environment Variables Explanation
 
-1. Watch console for `[Test Setup] QR Code received`
-2. Scan the QR code displayed in terminal
-3. Wait for `[Test Setup] WhatsApp client is ready`
-4. Tests will then execute with real WhatsApp integration
+| Variable             | Description                                   | Example                    |
+| -------------------- | --------------------------------------------- | -------------------------- |
+| `PORT`               | Port for test server (different from dev)     | `5001`                     |
+| `NODE_ENV`           | Must be set to `test`                         | `test`                     |
+| `REDIS_USER_NAME`    | Redis username                                | `default`                  |
+| `REDIS_PASSWORD`     | Your Redis password                           | `yourpassword`             |
+| `REDIS_HOST`         | Redis server host                             | `localhost`                |
+| `REDIS_PORT`         | Redis server port                             | `6379`                     |
+| `TEST_PHONE_NUMBERS` | Phone numbers for testing (with country code) | `919876543210,14155552671` |
 
-**Note**: QR code appears in the terminal. Use your phone's WhatsApp to scan it.
+### 3. Phone Number Format
 
-### Option 2: Use Already Authenticated Session
+Phone numbers must be in the format: `{country_code}{number}` (no + sign, no spaces)
 
-If you've already authenticated WhatsApp in production:
-
-```bash
-# The .wwebjs_auth folder contains your session
-# Tests will use this session automatically
-pnpm test
-```
-
-No QR code scanning needed if session is valid!
-
-## Checking Production Environment
-
-### Is WhatsApp Connected in Production?
-
-Check the status endpoint:
-
-```bash
-curl http://localhost:5000/api/v1/whatsapp/status
-```
-
-Expected response when working:
-
-```json
-{
-  "success": true,
-  "data": {
-    "client": {
-      "status": "ready",
-      "isReady": true
-    },
-    "queue": {...}
-  }
-}
-```
-
-If `status` is not "ready", messages won't send!
-
-### Common Issues & Solutions
-
-#### Issue: Client Status is "disconnected"
-
-**Solution**: Start/restart the server
-
-```bash
-pnpm run dev
-```
-
-Watch for QR code in console and scan it with WhatsApp on your phone.
-
-#### Issue: Client Status is "qr_pending"
-
-**Solution**: Scan the QR code displayed in the terminal with your phone's WhatsApp.
-
-#### Issue: Client Status is "authenticated" but not "ready"
-
-**Solution**: Wait a few more seconds. If it doesn't become "ready" after 30 seconds:
-
-1. Stop the server (Ctrl+C)
-2. Delete authentication data: `rm -rf .wwebjs_auth`
-3. Restart server and scan QR code again
-
-#### Issue: Tests pass but no messages on phone
-
-**Possible causes**:
-
-1. Phone number format is wrong (should be with country code, e.g., `919876543210`)
-2. WhatsApp client is not ready (check status as above)
-3. Message is in queue but worker hasn't processed it yet
-4. Wrong phone number in `.env.test`
-
-### Verify Phone Number Format
-
-Phone numbers must be in format: `{country_code}{number}` (no + sign, no spaces)
-
-Examples:
+**Examples:**
 
 - ✅ Correct: `919876543210` (India)
 - ✅ Correct: `14155552671` (USA)
@@ -138,116 +56,255 @@ Examples:
 - ❌ Wrong: `+1-415-555-2671`
 - ❌ Wrong: `9876543210` (missing country code)
 
-### Check Environment Variables
+### 4. Start Redis Server
 
-**.env.test file**:
-
-```env
-NODE_ENV=test
-PORT=5000
-# Add your phone numbers (comma-separated)
-TEST_PHONE_NUMBERS=919876543210,919876543211
-# Redis config...
-```
-
-## Test Behavior After Fixes
-
-### When WhatsApp is Ready ✅
-
-- All tests run normally
-- Messages are sent to real phone numbers
-- Tests verify actual success responses
-
-### When WhatsApp is Not Ready ⚠️
-
-- Tests check client status first
-- Tests that need client will skip with warning message
-- Tests show clear message: `WhatsApp client not ready. Status: disconnected`
-- Validation tests (that don't need client) still run
-
-### When Tests Fail ❌
-
-- Now tests fail with clear error messages
-- Status code mismatches are caught
-- `success: false` responses cause test failure
-- You'll see exact reason for failure
-
-## Running Server in Production
+Make sure Redis is running before executing tests:
 
 ```bash
-# Start the server
-pnpm run dev
-# or for production
-pnpm start
+# Check if Redis is running
+redis-cli ping
+# Should return: PONG
+
+# If not running, start Redis
+redis-server
 ```
 
-Watch the console logs:
+## Running Tests
 
-```
-[WhatsApp] Initializing client...
-[WhatsApp] QR code received
-```
+## Running Tests
 
-Scan the QR code, then you'll see:
+### Basic Test Execution
 
-```
-[WhatsApp] Authenticated successfully
-[WhatsApp] Client is ready
-```
-
-Once you see "Client is ready", you can send messages!
-
-## Sending Test Messages Manually
-
-### Using curl:
+Run all tests with the following command:
 
 ```bash
-# Single message
-curl -X POST http://localhost:5000/api/v1/whatsapp/send-message \
-  -H "Content-Type: application/json" \
-  -d '{
-    "phoneNumber": "919876543210",
-    "message": "Hello from WhatsApp API!"
-  }'
-
-# Bulk message
-curl -X POST http://localhost:5000/api/v1/whatsapp/send-bulk-message \
-  -H "Content-Type: application/json" \
-  -d '{
-    "phoneNumbers": ["919876543210", "919876543211"],
-    "message": "Bulk test message"
-  }'
+pnpm test
 ```
 
-### Expected Success Response:
+This command will:
 
-```json
-{
-  "success": true,
-  "message": "Message queued successfully for delivery",
-  "data": {
-    "phoneNumber": "919876543210",
-    "status": "sent",
-    "message": "Hello from WhatsApp API!",
-    "messageId": "...",
-    "timestamp": "2026-03-10T..."
-  }
-}
+1. Set `NODE_ENV=test` environment variable
+2. Load configuration from `.env.test` file
+3. Execute all test files using Jest
+4. Display test results in the terminal
+
+### Test Execution Options
+
+```bash
+# Run tests with coverage report
+pnpm test -- --coverage
+
+# Run specific test file
+pnpm test -- whatapp.route.test.ts
+
+# Run tests in watch mode (re-run on file changes)
+pnpm test -- --watch
+
+# Run tests with verbose output
+pnpm test -- --verbose
 ```
 
-## Troubleshooting Checklist
+## Test Types
 
-- [ ] Is server running?
-- [ ] Did you scan the QR code?
-- [ ] Is client status "ready"? (check `/api/v1/whatsapp/status`)
-- [ ] Are phone numbers in correct format? (country code + number, no +)
-- [ ] Is Redis running? (needed for message queue)
-- [ ] Are TEST_PHONE_NUMBERS set in `.env.test`?
-- [ ] Is the phone number registered on WhatsApp?
+### 1. Route Tests (`whatapp.route.test.ts`)
 
-## Summary
+Tests API endpoints and request/response handling:
 
-**Before**: Tests passed with 503 errors, no actual messages sent  
-**After**: Tests properly validate success, initialize WhatsApp client, and send real messages
+- Input validation
+- Response status codes
+- Response data structure
+- Error handling
 
-**Key improvement**: Tests now fail when they should, giving you accurate feedback about system health!
+### 2. Service Tests (`whatsapp.service.test.ts`)
+
+Tests business logic and service layer:
+
+- Message processing
+- Phone number validation
+- Service methods functionality
+
+## WhatsApp Client in Tests
+
+### Option 1: Run Tests Without WhatsApp Client (Unit Tests Only)
+
+The tests are designed to work even when the WhatsApp client is not initialized:
+
+- Validation tests will pass
+- Tests that require WhatsApp client will skip with a warning
+- Useful for CI/CD pipelines where WhatsApp authentication isn't available
+
+### Option 2: Run Tests With WhatsApp Client (Integration Tests)
+
+For full integration testing with real WhatsApp functionality:
+
+**Method A: Using Existing Session**
+If you've already authenticated WhatsApp in development:
+
+```bash
+# The .wwebjs_auth folder contains your session
+pnpm test
+```
+
+Tests will use the existing session automatically (no QR code needed).
+
+**Method B: Fresh Authentication**
+If no session exists:
+
+1. Run tests: `pnpm test`
+2. Watch console for `[Test Setup] QR Code received`
+3. Scan the QR code with WhatsApp on your phone
+4. Wait for `[Test Setup] WhatsApp client is ready`
+5. Tests will execute with real WhatsApp integration
+
+## Understanding Test Output
+
+### Successful Test Run
+
+```
+PASS  src/tests/whatapp.route.test.ts
+  WhatsApp Routes
+    GET /api/v1/whatsapp/status
+      ✓ should return client and queue status (150ms)
+    POST /api/v1/whatsapp/send-message
+      ✓ should send a message successfully (2500ms)
+    POST /api/v1/whatsapp/send-bulk-message
+      ✓ should send bulk messages (3200ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       3 passed, 3 total
+```
+
+### Skipped Tests (WhatsApp Not Ready)
+
+```
+PASS  src/tests/whatapp.route.test.ts
+  WhatsApp Routes
+    GET /api/v1/whatsapp/status
+      ✓ should return client status (100ms)
+    POST /api/v1/whatsapp/send-message
+      ○ skipped - WhatsApp client not ready. Status: disconnected
+
+Test Suites: 1 passed, 1 total
+Tests:       1 passed, 1 skipped, 2 total
+```
+
+## Troubleshooting
+
+### Issue: Tests fail with "Redis connection refused"
+
+**Solution:**
+
+```bash
+# Start Redis server
+redis-server
+
+# Or check if Redis is running
+redis-cli ping
+```
+
+### Issue: Tests can't find `.env.test` file
+
+**Solution:**
+
+- Ensure `.env.test` file exists in the project root
+- Check file permissions
+- Verify NODE_ENV is set to "test"
+
+### Issue: Invalid phone number in tests
+
+**Solution:**
+
+- Verify `TEST_PHONE_NUMBERS` in `.env.test`
+- Ensure format is: `{country_code}{number}` (no +, no spaces)
+- Example: `8801234567890` not `+8801234567890`
+
+### Issue: WhatsApp client not ready during tests
+
+**Solution:**
+This is expected behavior when:
+
+- You haven't authenticated WhatsApp yet
+- Running in CI/CD environment
+- Session has expired
+
+Tests requiring WhatsApp will skip automatically. To fix:
+
+1. Run development server: `pnpm dev`
+2. Scan QR code to authenticate
+3. Stop server and run tests again
+
+### Issue: Tests timeout
+
+**Solution:**
+
+```bash
+# Increase Jest timeout (in jest.config.ts)
+testTimeout: 30000  // 30 seconds
+
+# Or run tests with custom timeout
+pnpm test -- --testTimeout=60000
+```
+
+## CI/CD Considerations
+
+When running tests in CI/CD pipelines:
+
+1. **Set required environment variables** in your CI/CD platform
+2. **Ensure Redis is available** (use Docker service or cloud Redis)
+3. **Tests will skip WhatsApp-dependent tests** automatically
+4. **Use test database** if needed (configured via `.env.test`)
+
+Example GitHub Actions setup:
+
+```yaml
+services:
+  redis:
+    image: redis:6
+    ports:
+      - 6379:6379
+    options: >-
+      --health-cmd "redis-cli ping"
+      --health-interval 10s
+      --health-timeout 5s
+      --health-retries 5
+```
+
+## Best Practices
+
+1. **Always use `.env.test`** - Never use production credentials in tests
+2. **Use test phone numbers** - Don't spam real users during testing
+3. **Clean up after tests** - Tests automatically clean up WhatsApp client
+4. **Run tests before commits** - Ensure your changes don't break existing functionality
+5. **Check test coverage** - Run `pnpm test -- --coverage` regularly
+
+## Test File Locations
+
+- Route tests: `src/tests/whatapp.route.test.ts`
+- Service tests: `src/tests/whatsapp.service.test.ts`
+- Test configuration: `jest.config.ts`
+- Test environment: `.env.test`
+
+## Additional Commands
+
+```bash
+# Run tests with coverage and generate HTML report
+pnpm test -- --coverage --coverageReporters=html
+
+# Run only failed tests from last run
+pnpm test -- --onlyFailures
+
+# Update test snapshots (if using snapshot testing)
+pnpm test -- --updateSnapshot
+
+# Run tests silently (minimal output)
+pnpm test -- --silent
+```
+
+## Getting Help
+
+If you encounter issues not covered in this guide:
+
+1. Check the main [README.md](README.md) for general setup
+2. Review test files for implementation details
+3. Check Jest documentation: https://jestjs.io/docs/getting-started
+4. Ensure all prerequisites are met (Node.js, pnpm, Redis)

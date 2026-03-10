@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "test": "NODE_ENV=test jest --detectOpenHandles --forceExit",
-    "dev": "tsx watch src/server.ts",
+    "dev": " npx puppeteer browsers install chrome && tsx watch src/server.ts",
     "build": "npx eslint ./src && tsc",
     "start": "node ./dist/server.js",
     "postinstall": "prisma generate",
