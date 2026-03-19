@@ -152,6 +152,10 @@ backend/
 └── tsconfig.json              # TypeScript configuration
 ```
 
+## Documentation
+
+- [Software Architecture Document (SAD)](SAD.md) - Detailed architecture documentation including system overview, component diagrams, data flow, and design decisions
+
 ## API Documentation
 
 The API runs on `http://localhost:PORT` where PORT is defined in your `.env` file.
